@@ -12,6 +12,8 @@ LOG=/content/logs
 BIN=/content/llama-bin
 MODELS=/content/models
 mkdir -p "$LOG" "$MODELS"
+# Colab 的显卡驱动库（libcuda）在 /usr/lib64-nvidia，只在 notebook 内核环境里配了路径。
+export LD_LIBRARY_PATH=/usr/lib64-nvidia:${LD_LIBRARY_PATH:-}
 status() { echo "$*" >"$LOG/status"; echo "[$(date +%T)] $*"; }
 
 API_KEY=$(cat /content/.qwen_key 2>/dev/null) || { status "FAILED 没有 /content/.qwen_key"; exit 1; }
@@ -44,7 +46,7 @@ if [[ ! -x "$BIN/llama-server" ]]; then
         echo "已从 Releases 取到编译好的程序"
     fi
 fi
-if ! LD_LIBRARY_PATH=$BIN "$BIN/llama-server" --version >/dev/null 2>&1; then
+if ! LD_LIBRARY_PATH=$BIN:$LD_LIBRARY_PATH "$BIN/llama-server" --version >/dev/null 2>&1; then
     # 这张卡第一次用或程序不兼容：源码编译（约 8 分钟），编好打包等 up.sh 取回上传。
     status "BUILDING 首次编译 llama.cpp sm$SM（约 8 分钟）"
     rm -rf "$BIN" /content/llama.cpp
@@ -66,7 +68,7 @@ wait "$DL_PID"
 status "LOADING 加载模型"
 pkill -x llama-server; pkill -f 'tool_sanitizer:app'; sleep 2
 cd /content
-LD_LIBRARY_PATH=$BIN setsid nohup "$BIN/llama-server" \
+LD_LIBRARY_PATH=$BIN:$LD_LIBRARY_PATH setsid nohup "$BIN/llama-server" \
     -m "$MODELS/$MODEL_FILE" --mmproj "$MODELS/$MMPROJ" \
     --host 127.0.0.1 --port 8000 -c "$CTX" --parallel 1 -ngl 999 --flash-attn on \
     --cache-type-k q8_0 --cache-type-v q8_0 --jinja --no-context-shift \
