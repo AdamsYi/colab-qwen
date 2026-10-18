@@ -25,7 +25,7 @@ run_py() {
 }
 
 # 1. 开机（已有同名会话就复用）
-if "$COLAB" sessions 2>/dev/null | grep -q "^\[$SESSION\]"; then
+if "$COLAB" sessions 2>/dev/null | grep -qE "^\[$SESSION\] (gpu|tpu|cpu)-"; then
     echo "复用已有会话 $SESSION"
 else
     ok=0
