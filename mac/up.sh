@@ -30,10 +30,14 @@ if "$COLAB" sessions 2>/dev/null | grep -qE "^\[$SESSION\] (gpu|tpu|cpu)-"; then
 else
     ok=0
     for g in "${GPUS[@]}"; do
-        echo "尝试开 $g ..."
-        if "$COLAB" new -s "$SESSION" --gpu "$g" && "$COLAB" status -s "$SESSION" >/dev/null 2>&1; then
-            ok=1; break
-        fi
+        for try in 1 2 3; do  # 卡紧张时分配请求常超时，重试几次
+            echo "尝试开 $g（第 $try 次）..."
+            if "$COLAB" new -s "$SESSION" --gpu "$g" 2>&1 | grep -E '^\[colab\]' \
+                && "$COLAB" sessions 2>/dev/null | grep -qE "^\[$SESSION\] (gpu|tpu|cpu)-"; then
+                ok=1; break 2
+            fi
+            sleep 10
+        done
     done
     (( ok )) || { echo "开不到 GPU：${GPUS[*]}"; exit 1; }
 fi
