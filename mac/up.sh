@@ -29,14 +29,29 @@ if "$COLAB" sessions 2>/dev/null | grep -qE "^\[$SESSION\] (gpu|tpu|cpu)-"; then
     echo "复用已有会话 $SESSION"
 else
     ok=0
+    # 分配请求超时时 Colab 那边可能已经开出机器，CLI 不认识（sessions 里显示 [?]），
+    # 不释放会一直扣费。只释放本次尝试期间新冒出来的，不碰网页上开的。
+    orphans() { "$COLAB" sessions 2>/dev/null | sed -n 's/^\[?\] \([^ ]*\) .*/\1/p' | sort; }
+    release_new_orphans() {
+        local ep
+        for ep in $(comm -13 <(echo "$1") <(orphans)); do
+            echo "释放超时留下的机器 $ep"
+            "$(dirname "$(readlink "$COLAB" || echo "$COLAB")")/python" -c \
+                "from colab_cli.common import state; state.client.unassign('$ep')" 2>/dev/null \
+            || "$HOME/.local/share/uv/tools/google-colab-cli/bin/python" -c \
+                "from colab_cli.common import state; state.client.unassign('$ep')"
+        done
+    }
     for g in "${GPUS[@]}"; do
         for try in 1 2 3; do  # 卡紧张时分配请求常超时，重试几次
             echo "尝试开 $g（第 $try 次）..."
+            before=$(orphans)
             if "$COLAB" new -s "$SESSION" --gpu "$g" 2>&1 | grep -E '^\[colab\]' \
                 && "$COLAB" sessions 2>/dev/null | grep -qE "^\[$SESSION\] (gpu|tpu|cpu)-"; then
                 ok=1; break 2
             fi
             sleep 10
+            release_new_orphans "$before"
         done
     done
     (( ok )) || { echo "开不到 GPU：${GPUS[*]}"; exit 1; }
