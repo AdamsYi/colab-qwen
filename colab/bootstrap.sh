@@ -7,7 +7,6 @@ set -uo pipefail
 REPO=${REPO:-AdamsYi/colab-qwen}
 HF_REPO=huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF
 MMPROJ=mmproj-model-bf16.gguf
-BIN_URL=https://github.com/$REPO/releases/download/llama-bin/llama-bin.tar.gz
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 LOG=/content/logs
 BIN=/content/llama-bin
@@ -16,6 +15,10 @@ mkdir -p "$LOG" "$MODELS"
 status() { echo "$*" >"$LOG/status"; echo "[$(date +%T)] $*"; }
 
 API_KEY=$(cat /content/.qwen_key 2>/dev/null) || { status "FAILED 没有 /content/.qwen_key"; exit 1; }
+
+# 只为当前这张卡编译（A100=80、L4=89、T4=75、G4=120），Releases 按架构分别存。
+SM=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d .)
+BIN_URL=https://github.com/$REPO/releases/download/llama-bin/llama-bin-sm$SM.tar.gz
 
 # 按显存挑量化和上下文：A100 40G 跑 Q8，24G 跑 Q4，T4 16G 跑 IQ3。
 VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
@@ -42,18 +45,18 @@ if [[ ! -x "$BIN/llama-server" ]]; then
     fi
 fi
 if ! LD_LIBRARY_PATH=$BIN "$BIN/llama-server" --version >/dev/null 2>&1; then
-    # 第一次或程序不兼容：源码编译，覆盖 T4/A100/L4/H100/G4，编好打包等 up.sh 取回上传。
-    status "BUILDING 首次编译 llama.cpp（约 15 分钟）"
+    # 这张卡第一次用或程序不兼容：源码编译（约 8 分钟），编好打包等 up.sh 取回上传。
+    status "BUILDING 首次编译 llama.cpp sm$SM（约 8 分钟）"
     rm -rf "$BIN" /content/llama.cpp
     export PATH=/usr/local/cuda/bin:$PATH CUDACXX=/usr/local/cuda/bin/nvcc
     git clone --depth 1 https://github.com/ggml-org/llama.cpp /content/llama.cpp >"$LOG/build.log" 2>&1 \
     && cmake -S /content/llama.cpp -B /content/llama.cpp/build -DGGML_CUDA=ON \
-        -DCMAKE_CUDA_ARCHITECTURES="75;80;89;90;120" -DLLAMA_CURL=OFF >>"$LOG/build.log" 2>&1 \
+        -DCMAKE_CUDA_ARCHITECTURES="$SM" -DLLAMA_CURL=OFF >>"$LOG/build.log" 2>&1 \
     && cmake --build /content/llama.cpp/build --config Release -j "$(nproc)" --target llama-server >>"$LOG/build.log" 2>&1 \
     || { status "FAILED 编译失败，见 $LOG/build.log"; exit 1; }
     mkdir -p "$BIN" && cp -a /content/llama.cpp/build/bin/. "$BIN/"
     tar -czf /content/llama-bin.tar.gz -C "$BIN" .
-    touch "$LOG/need_upload"
+    echo "$SM" >"$LOG/need_upload"
 fi
 
 status "DOWNLOADING 等模型下载完"

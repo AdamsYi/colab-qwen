@@ -25,7 +25,7 @@ mac/tunnel.sh start|stop|status   # 只管本地隧道
 
 1. `colab new` 开 GPU 运行时
 2. 运行时里 `git clone` 本仓库，后台执行 `colab/bootstrap.sh`：
-   - 从本仓库 Releases（tag `llama-bin`）取编译好的 llama-server；没有或不兼容就源码编译（约 15 分钟），编好由 `up.sh` 上传到 Releases，之后不再编译
+   - 从本仓库 Releases（tag `llama-bin`）取编译好的 llama-server；没有或不兼容就源码编译（约 8 分钟，只编当前这张卡），编好由 `up.sh` 上传到 Releases，同型号卡之后不再编译
    - 从 Hugging Face 下载模型（A100 下约 1.5 分钟）
    - 启动 llama-server（8000，带 API Key）和 `tool_sanitizer.py`（8001）
 3. 本机建 SSH 隧道 `127.0.0.1:8089 → 运行时 8001`，断线自动重连

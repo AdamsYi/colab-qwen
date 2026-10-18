@@ -67,17 +67,18 @@ done
 
 # 4. 第一次编译出来的程序存到 GitHub Releases，下次直接拿
 need=$(run_py <<'EOF'
-import os; print("yes" if os.path.exists("/content/logs/need_upload") else "no")
+import os; p="/content/logs/need_upload"; print(open(p).read().strip() if os.path.exists(p) else "no")
 EOF
 )
-if [[ "$(echo "$need" | tail -1)" == yes ]]; then
+sm=$(echo "$need" | tail -1)
+if [[ "$sm" != no ]]; then
     echo "上传编译好的 llama.cpp 到 GitHub Releases ..."
     tmp=$(mktemp -d)
-    "$COLAB" download -s "$SESSION" /content/llama-bin.tar.gz "$tmp/llama-bin.tar.gz"
+    "$COLAB" download -s "$SESSION" /content/llama-bin.tar.gz "$tmp/llama-bin-sm$sm.tar.gz"
     gh release view llama-bin -R "$REPO" >/dev/null 2>&1 \
         || gh release create llama-bin -R "$REPO" -t "llama.cpp CUDA 程序" \
-            -n "Colab 上编译的 llama-server（sm 75/80/89/90/120），bootstrap.sh 自动下载。"
-    gh release upload llama-bin -R "$REPO" "$tmp/llama-bin.tar.gz" --clobber
+            -n "Colab 上编译的 llama-server，按显卡架构分文件（llama-bin-smXX.tar.gz），bootstrap.sh 自动下载。"
+    gh release upload llama-bin -R "$REPO" "$tmp/llama-bin-sm$sm.tar.gz" --clobber
     rm -rf "$tmp"
     run_py <<'EOF'
 import os; os.remove("/content/logs/need_upload")
