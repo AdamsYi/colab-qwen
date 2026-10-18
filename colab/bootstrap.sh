@@ -42,13 +42,13 @@ if [[ ! -x "$BIN/llama-server" ]]; then
     fi
 fi
 if ! LD_LIBRARY_PATH=$BIN "$BIN/llama-server" --version >/dev/null 2>&1; then
-    # 第一次或程序不兼容：源码编译，覆盖 T4/A100/L4/H100，编好打包等 up.sh 取回上传。
+    # 第一次或程序不兼容：源码编译，覆盖 T4/A100/L4/H100/G4，编好打包等 up.sh 取回上传。
     status "BUILDING 首次编译 llama.cpp（约 15 分钟）"
     rm -rf "$BIN" /content/llama.cpp
     export PATH=/usr/local/cuda/bin:$PATH CUDACXX=/usr/local/cuda/bin/nvcc
     git clone --depth 1 https://github.com/ggml-org/llama.cpp /content/llama.cpp >"$LOG/build.log" 2>&1 \
     && cmake -S /content/llama.cpp -B /content/llama.cpp/build -DGGML_CUDA=ON \
-        -DCMAKE_CUDA_ARCHITECTURES="75;80;89;90" -DLLAMA_CURL=OFF >>"$LOG/build.log" 2>&1 \
+        -DCMAKE_CUDA_ARCHITECTURES="75;80;89;90;120" -DLLAMA_CURL=OFF >>"$LOG/build.log" 2>&1 \
     && cmake --build /content/llama.cpp/build --config Release -j "$(nproc)" --target llama-server >>"$LOG/build.log" 2>&1 \
     || { status "FAILED 编译失败，见 $LOG/build.log"; exit 1; }
     mkdir -p "$BIN" && cp -a /content/llama.cpp/build/bin/. "$BIN/"

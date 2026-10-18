@@ -76,7 +76,7 @@ if [[ "$(echo "$need" | tail -1)" == yes ]]; then
     "$COLAB" download -s "$SESSION" /content/llama-bin.tar.gz "$tmp/llama-bin.tar.gz"
     gh release view llama-bin -R "$REPO" >/dev/null 2>&1 \
         || gh release create llama-bin -R "$REPO" -t "llama.cpp CUDA 程序" \
-            -n "Colab 上编译的 llama-server（sm 75/80/89/90），bootstrap.sh 自动下载。"
+            -n "Colab 上编译的 llama-server（sm 75/80/89/90/120），bootstrap.sh 自动下载。"
     gh release upload llama-bin -R "$REPO" "$tmp/llama-bin.tar.gz" --clobber
     rm -rf "$tmp"
     run_py <<'EOF'
